@@ -31,6 +31,7 @@ glm::vec3 g_triangleColor = { 1, 1, 1 };
 // consists of positions (from positionBuffer) and color (from colorBuffer)
 // in this example.
 GLuint vertexArrayObject;
+GLuint vertexArrayObject2;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
@@ -81,6 +82,9 @@ void initialize()
 		1.0f, 1.0f, 1.0f, // White
 		1.0f, 1.0f, 1.0f, // White
 		1.0f, 1.0f, 1.0f  // White
+		//1.0f, 0.5f, 0.9f, 
+		//0.8f, 1.0f, 0.7f,
+		//0.3f, 0.4f, 1.0f
 	};
 	// Create a handle for the vertex color buffer
 	GLuint colorBuffer;
@@ -116,7 +120,57 @@ void initialize()
 	//		   object, and then by adding a triangle to an existing VAO.
 	//////////////////////////////////////////////////////////////////////////////
 
+	const float positions2[] = {
+		//	 X      Y     Z
+		-0.9f,  0.6f,  1.0f, // v0
+		-0.3f,  0.6f, 1.0f, // v1
+		-0.5f,   0.0f, 1.0f,  // v2
+		//the third triangle
+		-0.8f,  0.0f,  1.0f,
+		-0.6f,  0.0f,  1.0f,
+		-0.5f, -0.6f,  1.0f
+	};
 
+	const float colors2[] = {
+		1.0f, 0.5f, 0.9f,
+		0.8f, 1.0f, 0.7f,
+		0.3f, 0.4f, 1.0f,
+		//the third triangle
+		0.8f,  0.3f,  0.1f,
+		0.2f,  0.8f,  0.5f,
+		0.3f,  0.6f,  0.8f
+	};
+
+	
+	GLuint positionBuffer2;
+	// Create a handle for the position vertex buffer object
+	glGenBuffers(1, &positionBuffer2);
+	// Set the newly created buffer as the current one
+	glBindBuffer(GL_ARRAY_BUFFER, positionBuffer2);
+	// Send the vertex position data to the current buffer
+	glBufferData(GL_ARRAY_BUFFER, labhelper::array_length(positions2) * sizeof(float), positions2,
+		GL_STATIC_DRAW);
+
+	GLuint colorBuffer2;
+	// Create a handle for the vertex color buffer
+	glGenBuffers(1, &colorBuffer2);
+	// Set the newly created buffer as the current one
+	glBindBuffer(GL_ARRAY_BUFFER, colorBuffer2);
+	// Send the vertex color data to the current buffer
+	glBufferData(GL_ARRAY_BUFFER, labhelper::array_length(colors2) * sizeof(float), colors2, GL_STATIC_DRAW);
+
+	glGenVertexArrays(1, &vertexArrayObject2);
+	glBindVertexArray(vertexArrayObject2);
+
+	//bind position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, positionBuffer2);
+	glVertexAttribPointer(0, 3, GL_FLOAT, false /*normalized*/, 0 /*stride*/, 0 /*offset*/);
+	glEnableVertexAttribArray(0);
+
+	//bind color buffer
+	glBindBuffer(GL_ARRAY_BUFFER, colorBuffer2);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
 
 	///////////////////////////////////////////////////////////////////////////
 	// Create shaders
@@ -204,8 +258,7 @@ void display(void)
 	glViewport(0, 0, w, h); // Set viewport
 
 	glClearColor(g_clearColor[0], g_clearColor[1], g_clearColor[2], 1.0); // Set clear color
-	glClear(GL_BUFFER); // Clears the color buffer and the z-buffer
-	                    // Instead of glClear(GL_BUFFER) the call should be glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// We disable backface culling for this tutorial, otherwise care must be taken with the winding order
 	// of the vertices. It is however a lot faster to enable culling when drawing large scenes.
@@ -218,11 +271,19 @@ void display(void)
 
 	// Bind the vertex array object that contains all the vertex data.
 	glBindVertexArray(vertexArrayObject);
+
+	labhelper::setUniformSlow(shaderProgram, "triangleColor", g_triangleColor);
+
 	// Submit triangles from currently bound vertex array object.
 	glDrawArrays(GL_TRIANGLES, 0, 3); // Render 1 triangle
 
+	labhelper::setUniformSlow(shaderProgram, "triangleColor", glm::vec3(1, 1, 1));
 
 	// Task 4: Render the second VAO
+	
+	glBindVertexArray(vertexArrayObject2);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+
 	// Task 5: Set the `triangleColor` uniform to white
 
 	glUseProgram(0); // "unsets" the current shader program. Not really necessary.
@@ -238,6 +299,8 @@ void gui()
 	ImGui::ColorEdit3("clear color", g_clearColor);
 
 	// Task 5: Add a new ColorEdit3 control to modify the g_triangleColor variable
+
+	ImGui::ColorEdit3("triangle color", &g_triangleColor.x);
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
 	            ImGui::GetIO().Framerate);
@@ -283,7 +346,7 @@ int main(int argc, char* argv[])
 		// Task 1: Uncomment the call to gui below to show the GUI
 		///////////////////////////////////////////////////////////////////////////
 		// Then render overlay GUI.
-		// gui();
+		gui();
 
 		// Render the GUI.
 		ImGui::Render();
