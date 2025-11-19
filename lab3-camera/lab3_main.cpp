@@ -94,6 +94,8 @@ void initialize()
 
 	// Load models
 	loadModels();
+
+	carModelMatrix = glm::translate(glm::vec3(0.0f, 5.0f, 0.0f)); // Moves the car by 5 along the Y axis
 }
 
 void drawGround(mat4 mvpMatrix)
@@ -142,11 +144,18 @@ void display()
 	// Set up the view matrix
 	// The view matrix defines where the viewer is looking
 	// Initially fixed, but will be replaced in the tutorial.
-	mat4 constantViewMatrix = mat4(0.707106769f, -0.408248276f, 1.00000000f, 0.000000000f,  //
-	                               0.000000000f, 0.816496551f, 1.00000000f, 0.000000000f,   //
+	/* mat4 constantViewMatrix = mat4(0.707106769f, -0.408248276f, 1.00000000f, 0.000000000f,  //
+	                             0.000000000f, 0.816496551f, 1.00000000f, 0.000000000f,   //
 	                               -0.707106769f, -0.408248276f, 1.00000000f, 0.000000000f, //
-	                               0.000000000f, 0.000000000f, -30.0000000f, 1.00000000f);  //
-	mat4 viewMatrix = constantViewMatrix;
+	                               0.000000000f, 0.000000000f, -30.0000000f, 1.00000000f);  //*/
+	
+	// use camera direction as -z axis and compute the x (cameraRight) and y (cameraUp) base vectors
+	vec3 cameraRight = normalize(cross(cameraDirection, worldUp));
+	vec3 cameraUp = normalize(cross(cameraRight, cameraDirection));
+
+	mat3 cameraBaseVectorsWorldSpace(cameraRight, cameraUp, -cameraDirection);
+	mat4 cameraRotation = mat4(transpose(cameraBaseVectorsWorldSpace));						   
+	mat4 viewMatrix = cameraRotation * translate(-cameraPosition);
 
 	// Setup the projection matrix
 	if(w != old_w || h != old_h)
@@ -172,12 +181,23 @@ void display()
 
 	// Ground
 	// Task 5: Uncomment this
-	//drawGround(modelViewProjectionMatrix);
+	drawGround(modelViewProjectionMatrix);
 
 	// car
 	modelViewProjectionMatrix = projectionMatrix * viewMatrix * carModelMatrix;
 	glUniformMatrix4fv(mvploc, 1, false, &modelViewProjectionMatrix[0].x);
 	glUniformMatrix4fv(mloc, 1, false, &carModelMatrix[0].x);
+	render(carModel);
+
+	// The second car
+	mat4 r = glm::rotate(float(currentTime * M_PI * -0.5f), vec3(0.0f, 1.0f, 0.0f));
+	mat4 t = glm::translate(vec3(20.0f, 0.0f, 0.0f));
+	mat4 t2 = glm::translate(vec3(r * vec4(10.f, 0, 0, 1.f)));
+	mat4 car2ModelMatrix = t * t2 * r;
+	modelViewProjectionMatrix = projectionMatrix * viewMatrix * car2ModelMatrix;
+	// Update the modelViewProjectionMatrix used in the vertex shader
+	glUniformMatrix4fv(mvploc, 1, false, &modelViewProjectionMatrix[0].x);
+	glUniformMatrix4fv(mloc, 1, false, &car2ModelMatrix[0].x);
 	render(carModel);
 
 
@@ -235,7 +255,10 @@ bool handleEvents(void)
 			int delta_y = event.motion.y - g_prevMouseCoords.y;
 			if(event.button.button == SDL_BUTTON_LEFT)
 			{
-				printf("Mouse motion while left button down (%i, %i)\n", event.motion.x, event.motion.y);
+				float rotationSpeed = 0.005f;
+				mat4 yaw = rotate(rotationSpeed * -delta_x, worldUp);
+				mat4 pitch = rotate(rotationSpeed * -delta_y, normalize(cross(cameraDirection, worldUp)));
+				cameraDirection = vec3(pitch * yaw * vec4(cameraDirection, 0.0f));
 			}
 			g_prevMouseCoords.x = event.motion.x;
 			g_prevMouseCoords.y = event.motion.y;
@@ -245,23 +268,41 @@ bool handleEvents(void)
 	// check keyboard state (which keys are still pressed)
 	const uint8_t* state = SDL_GetKeyboardState(nullptr);
 
+	// Add camera movement
+
+	const float camSpeed = 10.0f;
+
+	if (state[SDL_SCANCODE_W])
+	{
+		cameraPosition += cameraDirection * camSpeed * deltaTime;
+	}
+	if (state[SDL_SCANCODE_S])
+	{
+		cameraPosition -= cameraDirection * camSpeed * deltaTime;
+	}
+
 	// implement camera controls based on key states
+	const float speed = 10.f;
+	const float rotateSpeed = 2.f;
+	vec3 car_forward = vec3(0, 0, 1);
+	car_forward = vec3(R * vec4(car_forward, 0)); // Rotate the forward direction by the car's current rotation matrix
 	if(state[SDL_SCANCODE_UP])
 	{
-		printf("Key Up is pressed down\n");
+		T = translate(car_forward * speed * deltaTime) * T;
 	}
 	if(state[SDL_SCANCODE_DOWN])
 	{
-		printf("Key Down is pressed down\n");
+		T = translate(-car_forward * speed * deltaTime) * T;
 	}
 	if(state[SDL_SCANCODE_LEFT])
 	{
-		printf("Key Left is pressed down\n");
+		R = glm::rotate(rotateSpeed * deltaTime, glm::vec3(0, 1, 0)) * R;
 	}
 	if(state[SDL_SCANCODE_RIGHT])
 	{
-		printf("Key Right is pressed down\n");
+		R = glm::rotate(-rotateSpeed * deltaTime, glm::vec3(0, 1, 0)) * R;
 	}
+	carModelMatrix = T * R;
 
 	return quitEvent;
 }
